@@ -187,7 +187,7 @@ input[type=range]{width:100%; accent-color:#ff8a3d; height:26px;}
 const Z = s => String(s).replace(/[0-9.\-]/g, c => c==='.' ? '．' : c==='-' ? '－' : String.fromCharCode(c.charCodeAt(0)+0xFEE0));
 
 const DIV_X = 10, DIV_Y = 8;
-const TDIVS = [0.2, 0.5, 1, 2, 5];          // ms / 目盛り
+const TDIVS = [0.5, 1];                       // ms / 目盛り（子どもどうしで同じ見え方になるよう2つだけ。最初は1ms）
 const GAINS = [1, 2, 5, 10, 20];
 const UNIT = 0.25;                            // 拡大×1 のとき 1目盛り＝0.25
 const FFT = 16384;
