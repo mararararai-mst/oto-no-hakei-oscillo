@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音の波形オシロスコープ｜中1理科・音による現象</title>
+<meta name="description" content="PCのマイクで拾った音を、オシロスコープのように波形で映すアプリ。止める・のこして重ねる・振動数（Hz）と振幅の表示・発振器つき。中1理科「音による現象」音の大きさや高さ（教科書p.162〜165）用。">
+<meta property="og:title" content="音の波形オシロスコープ｜PCがオシロになる">
+<meta property="og:description" content="声や楽器の音をマイクで拾って波形に。さっきの音をのこして重ねれば、大きい音は振幅が大きく、高い音は振動数が多いことが一目でくらべられる。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230b1210'/><path d='M8 50 Q20 15 32 50 T56 50 T80 50 T104 50' stroke='%233dff8a' stroke-width='9' fill='none'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b1210; --panel:#13201b; --panel2:#1a2b24;
+  --ink:#dcf5e8; --ink-soft:#8fb3a2;
+  --b:#3dff8a;   /* いまの音 */
+  --a:#ff6fa8;   /* のこした音 */
+  --btn:#22382e; --btn-on:#3dff8a;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN','BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif;
+  font-weight:500; padding:10px; display:flex; flex-direction:column; gap:8px;
+}
+header{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:2px 6px;}
+header h1{margin:0; font-size:1.35rem; font-weight:900; letter-spacing:.03em;}
+header .sub{color:var(--ink-soft); font-size:.92rem; font-weight:700;}
+header .sp{flex:1}
+header .hl{color:var(--ink-soft); font-size:.9rem; font-weight:900;}
+header .seg .btn{flex:none; padding:7px 12px;}
+.main{flex:1; display:flex; gap:10px; min-height:0;}
+.scope-col{flex:1; display:flex; flex-direction:column; gap:8px; min-width:0;}
+.scope{position:relative; flex:1; min-height:260px; background:#050a08; border-radius:14px; overflow:hidden;}
+#cv{position:absolute; inset:0; width:100%; height:100%; display:block;}
+.status{position:absolute; left:12px; top:10px; font-weight:900; font-size:1.05rem; color:var(--ink-soft);}
+.status.stop{color:#ffd23d;}
+.legend{position:absolute; right:12px; top:10px; display:flex; gap:14px; font-weight:900; font-size:1.05rem;}
+.legend .la{color:var(--a)} .legend .lb{color:var(--b)}
+.scale{position:absolute; left:12px; bottom:10px; font-weight:900; font-size:1.05rem; color:var(--ink);}
+.scale small{color:var(--ink-soft); font-weight:700;}
+.start{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:rgba(5,10,8,.9); text-align:center; padding:20px;}
+.start h2{margin:0; font-size:1.6rem; font-weight:900;}
+.start p{margin:0; color:var(--ink-soft); font-weight:700;}
+.start .row{display:flex; gap:14px; flex-wrap:wrap; justify-content:center;}
+.start .big{font-size:1.25rem; padding:16px 26px;}
+.err{color:#ffd23d; font-weight:900; max-width:560px;}
+
+.readout{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.card{background:var(--panel); border-radius:12px; padding:8px 14px;}
+.card h3{margin:0 0 2px; font-size:1rem; font-weight:900;}
+.card.ca h3{color:var(--a)} .card.cb h3{color:var(--b)}
+.card .vals{display:flex; gap:22px; flex-wrap:wrap; font-size:1.15rem; font-weight:900;}
+.card .vals small{font-size:.85rem; color:var(--ink-soft); font-weight:700; margin-right:4px;}
+.verdict{grid-column:1/-1; background:var(--panel2); border-radius:12px; padding:10px 14px; font-size:1.25rem; font-weight:900; min-height:48px;}
+.verdict .hi{color:#ffd23d}
+.verdict .muted{color:var(--ink-soft); font-size:1rem;}
+.hidenum .num{visibility:hidden;}
+
+.side{width:300px; flex:none; display:flex; flex-direction:column; gap:8px; overflow-y:auto;}
+.box{background:var(--panel); border-radius:12px; padding:10px 12px;}
+.box h4{margin:0 0 7px; font-size:.95rem; font-weight:900; color:var(--ink-soft);}
+.btn{
+  border:none; border-radius:10px; padding:9px 10px; font-size:.98rem; color:var(--ink);
+  font-family:inherit; font-weight:900; background:var(--btn); cursor:pointer;
+}
+.btn:hover{filter:brightness(1.18)}
+.btn:active{transform:translateY(1px)}
+.btn.on{background:var(--btn-on); color:#06200f;}
+.btn.wide{width:100%;}
+.btn.pause{font-size:1.15rem; padding:12px;}
+.btn.pause.on{background:#ffd23d; color:#2a2000;}
+.btn.save{background:var(--a); color:#3a0019;}
+.btn.play.on{background:#ff8a3d; color:#2a1000;}
+.btn:disabled{opacity:.35; cursor:default; filter:none;}
+.seg{display:flex; gap:4px; flex-wrap:wrap;}
+.seg .btn{flex:1; padding:7px 4px; font-size:.9rem; min-width:44px;}
+.row2{display:flex; gap:6px;}
+.row2 .btn{flex:1;}
+.freq{display:flex; align-items:baseline; justify-content:center; gap:6px; font-weight:900; margin:2px 0 4px;}
+.freq b{font-size:1.7rem; color:#ff8a3d;}
+input[type=range]{width:100%; accent-color:#ff8a3d; height:26px;}
+.keys{color:var(--ink-soft); font-size:.8rem; font-weight:700; line-height:1.5;}
+@media (max-width:1180px){ header .sub{display:none;} }
+@media (max-height:800px){
+  .side{gap:6px;} .box{padding:8px 10px;} .box h4{margin-bottom:4px;}
+  .seg .btn{padding:6px 4px;} .freq b{font-size:1.45rem;} .btn.pause{padding:9px;}
+}
+@media (max-width:820px){
+  .main{flex-direction:column;}
+  .side{width:auto; overflow:visible;}
+  .scope{min-height:300px;}
+  .readout{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>音の波形オシロスコープ</h1>
+  <span class="sub">中１理科　音による現象　音の大きさや高さ</span>
+  <span class="sp"></span>
+  <span class="hl">入力</span>
+  <div class="seg" id="segSrc">
+    <button class="btn" data-src="mic">マイク</button>
+    <button class="btn" data-src="osc">発振器をそのまま</button>
+  </div>
+  <span class="hl">数値</span>
+  <div class="seg" id="segNum">
+    <button class="btn on" data-num="1">見せる</button>
+    <button class="btn" data-num="0">かくす</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="scope-col">
+    <div class="scope" id="scope">
+      <canvas id="cv"></canvas>
+      <div class="status" id="status">―</div>
+      <div class="legend"><span class="la" id="legA" style="display:none">━ のこした音</span><span class="lb">━ いまの音</span></div>
+      <div class="scale" id="scale"></div>
+      <div class="start" id="start">
+        <h2>音を波形で見てみよう</h2>
+        <p>声・おんさ・リコーダーなど、音を出す物（音源）をマイクに近づけます</p>
+        <div class="row">
+          <button class="btn on big" id="btnMicStart">マイクではかる</button>
+          <button class="btn big" id="btnOscStart">発振器の音をそのまま映す</button>
+        </div>
+        <div class="err" id="err"></div>
+      </div>
+    </div>
+    <div class="readout" id="readout">
+      <div class="card ca"><h3>のこした音</h3>
+        <div class="vals"><span><small>振動数</small><span class="num" id="aF">―</span></span><span><small>振幅</small><span class="num" id="aA">―</span></span></div>
+      </div>
+      <div class="card cb"><h3>いまの音</h3>
+        <div class="vals"><span><small>振動数</small><span class="num" id="bF">―</span></span><span><small>振幅</small><span class="num" id="bA">―</span></span></div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="box">
+      <button class="btn pause wide" id="btnPause">止める（スペース）</button>
+      <div class="row2" style="margin-top:6px">
+        <button class="btn save" id="btnSave">のこす（Ｓ）</button>
+        <button class="btn" id="btnClear" disabled>のこした音を消す</button>
+      </div>
+    </div>
+    <div class="box">
+      <h4>よこ（時間）　１目盛り＝</h4>
+      <div class="seg" id="segT"></div>
+    </div>
+    <div class="box">
+      <h4>たて（拡大）</h4>
+      <div class="seg" id="segG"></div>
+      <button class="btn wide" id="btnAuto" style="margin-top:6px">ちょうどよく合わせる</button>
+    </div>
+    <div class="box">
+      <h4>発振器（音を出す）</h4>
+      <div class="freq"><b id="oscF">４４０</b> Hz</div>
+      <input type="range" id="rngF" min="0" max="1000" value="500">
+      <div class="seg" style="margin:4px 0 8px">
+        <button class="btn" data-pf="262">低い２６２</button>
+        <button class="btn" data-pf="440">４４０</button>
+        <button class="btn" data-pf="880">高い８８０</button>
+      </div>
+      <h4>音の大きさ</h4>
+      <div class="seg" id="segV">
+        <button class="btn" data-v="0.04">小</button>
+        <button class="btn on" data-v="0.08">中</button>
+        <button class="btn" data-v="0.15">大</button>
+      </div>
+      <button class="btn play wide" id="btnPlay" style="margin-top:8px">▶ 鳴らす</button>
+    </div>
+    <div class="keys">キー：スペース＝止める／再開　Ｓ＝のこす　Ｐ＝発振器を鳴らす／止める</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* 表記：数字は全角 */
+const Z = s => String(s).replace(/[0-9.\-]/g, c => c==='.' ? '．' : c==='-' ? '－' : String.fromCharCode(c.charCodeAt(0)+0xFEE0));
+
+const DIV_X = 10, DIV_Y = 8;
+const TDIVS = [0.2, 0.5, 1, 2, 5];          // ms / 目盛り
+const GAINS = [1, 2, 5, 10, 20];
+const UNIT = 0.25;                            // 拡大×1 のとき 1目盛り＝0.25
+const FFT = 16384;
+
+const st = {
+  ctx:null, an:null, src:'mic', micNode:null, micStream:null,
+  osc:null, oscVol:null, spk:null, playing:false, oscF:440, oscV:0.08,
+  tdiv:1, gain:5, paused:false, showNum:true,
+  cur:null, saved:null, buf:null, frame:0, started:false,
+  stab:true, fHist:[]
+};
+const $ = id => document.getElementById(id);
+const cv = $('cv'), g2 = cv.getContext('2d');
+
+/* 音の準備 */
+function ensureCtx(){
+  if(st.ctx) return st.ctx;
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const an = ctx.createAnalyser(); an.fftSize = FFT; an.smoothingTimeConstant = 0;
+  const vol = ctx.createGain(); vol.gain.value = st.oscV;
+  const spk = ctx.createGain(); spk.gain.value = 4;   // スピーカーへは大きめに
+  vol.connect(spk); spk.connect(ctx.destination);
+  st.ctx = ctx; st.an = an; st.oscVol = vol; st.spk = spk;
+  st.buf = new Float32Array(FFT);
+  return ctx;
+}
+async function startMic(){
+  ensureCtx(); await st.ctx.resume();
+  if(!st.micStream){
+    // 大きさのちがいを消さないよう、自動音量調整・雑音除去はすべて切る
+    const s = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    useStream(s);
+  }
+  setSrc('mic');
+}
+function useStream(s){
+  ensureCtx();
+  if(st.micNode) try{st.micNode.disconnect()}catch(e){}
+  st.micStream = s;
+  st.micNode = st.ctx.createMediaStreamSource(s);
+  if(st.src==='mic') st.micNode.connect(st.an);
+}
+function setSrc(src){
+  ensureCtx();
+  st.src = src;
+  try{ st.micNode && st.micNode.disconnect(); }catch(e){}
+  try{ st.oscVol.disconnect(st.an); }catch(e){}
+  if(src==='mic' && st.micNode) st.micNode.connect(st.an);
+  if(src==='osc') st.oscVol.connect(st.an);
+  document.querySelectorAll('#segSrc .btn').forEach(b=>b.classList.toggle('on', b.dataset.src===src));
+  $('start').style.display='none'; st.started = true;
+}
+
+/* 発振器 */
+function play(on){
+  ensureCtx(); st.ctx.resume();
+  if(on && !st.osc){
+    const o = st.ctx.createOscillator(); o.type='sine'; o.frequency.value = st.oscF;
+    o.connect(st.oscVol); o.start(); st.osc = o;
+  }else if(!on && st.osc){
+    st.osc.stop(); st.osc.disconnect(); st.osc = null;
+  }
+  st.playing = !!st.osc;
+  $('btnPlay').classList.toggle('on', st.playing);
+  $('btnPlay').textContent = st.playing ? '■ 止める' : '▶ 鳴らす';
+}
+const fToR = f => Math.round(Math.log(f/100)/Math.log(20)*1000);   // 100〜2000Hz を対数で
+const rToF = r => Math.round(100*Math.pow(20, r/1000));
+function setOscF(f){
+  st.oscF = Math.max(100, Math.min(2000, Math.round(f)));
+  $('oscF').textContent = Z(st.oscF);
+  $('rngF').value = fToR(st.oscF);
+  if(st.osc) st.osc.frequency.setTargetAtTime(st.oscF, st.ctx.currentTime, 0.01);
+}
+function setOscV(v){
+  st.oscV = v;
+  if(st.oscVol) st.oscVol.gain.setTargetAtTime(v, st.ctx.currentTime, 0.01);
+  document.querySelectorAll('#segV .btn').forEach(b=>b.classList.toggle('on', +b.dataset.v===v));
+}
+
+/* 解析：振動数（自己相関）と振幅 */
+function estimateF(x, sr){
+  const W = 2048, minLag = Math.floor(sr/2500), maxLag = Math.ceil(sr/60);
+  if(x.length < W + maxLag + 3) return null;
+  let e0 = 0; for(let i=0;i<W;i++) e0 += x[i]*x[i];
+  if(Math.sqrt(e0/W) < 0.003) return null;
+  const c = new Float32Array(maxLag+2);
+  let eL = 0; for(let i=minLag;i<minLag+W;i++) eL += x[i]*x[i];
+  for(let lag=minLag; lag<=maxLag+1; lag++){
+    let s = 0; for(let i=0;i<W;i++) s += x[i]*x[i+lag];
+    c[lag] = s / Math.sqrt(e0*eL + 1e-12);
+    eL += x[lag+W]*x[lag+W] - x[lag]*x[lag];
+  }
+  let mx = -1; for(let l=minLag+1;l<=maxLag;l++) if(c[l]>mx) mx=c[l];
+  if(mx < 0.6) return {f:null, conf:mx};
+  for(let l=minLag+1;l<=maxLag;l++){
+    if(c[l]>=0.9*mx && c[l]>=c[l-1] && c[l]>=c[l+1]){
+      const a=c[l-1], b=c[l], d=c[l+1], den = a-2*b+d;
+      const sh = den ? 0.5*(a-d)/den : 0;
+      return {f: sr/(l+sh), conf:b};
+    }
+  }
+  return {f:null, conf:mx};
+}
+function ampOf(d, n){
+  let mn=1e9, mx=-1e9; for(let i=0;i<n;i++){ const v=d[i]; if(v<mn)mn=v; if(v>mx)mx=v; }
+  return (mx-mn)/2;
+}
+
+/* トリガ：上向きに0をこえる所に合わせて、波形を止まって見せる */
+function capture(){
+  const x = st.buf, sr = st.ctx.sampleRate;
+  st.an.getFloatTimeDomainData(x);
+  const N = x.length;
+  const maxWin = Math.ceil(TDIVS[TDIVS.length-1]*DIV_X/1000*sr);
+  const search = Math.ceil(sr/40);
+  const s0 = N - maxWin - search;
+  const peak = ampOf(x.subarray(s0), N-s0);
+  const h = Math.max(0.002, peak*0.15);
+  let armed=false, trig=s0;
+  for(let i=s0-search; i<s0+search; i++){
+    if(x[i] < -h) armed = true;
+    else if(armed && i>=s0 && x[i-1] < 0 && x[i] >= 0){ trig = i; break; }
+  }
+  // 声のように1回の振動で0を何度も横切る音は、上の方法だと止まる位置が飛ぶ。
+  // 振動数がわかっているときは、前の画面の波形といちばんよく重なる位置（1周期の中）に合わせる
+  const prev = st.cur;
+  if(st.stab && prev && !prev.silent && prev.f && prev.sr === sr){
+    const P = Math.round(sr/prev.f);
+    const L = Math.min(Math.round(2*P), 768, prev.data.length);
+    if(P > 4 && P <= search && L > 8){
+      const pd = prev.data;
+      let ep = 0; for(let i=0;i<L;i++) ep += pd[i]*pd[i];
+      const corr = s => { let c=0, e=0; for(let i=0;i<L;i++){ const v=x[s+i]; c += v*pd[i]; e += v*v; } return c/Math.sqrt(ep*e + 1e-12); };
+      let best = -2, bestS = trig;
+      for(let s=s0; s<s0+P; s++){ const r = corr(s); if(r > best){ best = r; bestS = s; } }
+      // 0を上向きに横切る位置でも十分重なるなら、そちらを使う（なめらかな音は0から始まって見やすい）
+      if(best > 0.5 && corr(trig) < best - 0.03) trig = bestS;
+    }
+  }
+  const data = x.slice(trig, trig+maxWin);
+  const win = Math.ceil(st.tdiv*DIV_X/1000*sr);
+  return {data, sr, amp: ampOf(data, Math.min(win, data.length)), raw:x};
+}
+
+/* 描画 */
+function resize(){
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio||1;
+  cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr);
+}
+function geom(){
+  const W = cv.width, H = cv.height;
+  const padT = H*0.10, padB = H*0.12, gh = H - padT - padB;
+  let dy = gh/DIV_Y, dx = dy;
+  if(dx*DIV_X > W*0.96){ dx = W*0.96/DIV_X; dy = dx; }
+  const gw = dx*DIV_X, gH = dy*DIV_Y;
+  return {x0:(W-gw)/2, y0:padT+(gh-gH)/2, gw, gH, dx, dy};
+}
+function drawGrid(G){
+  const dpr = window.devicePixelRatio||1;
+  g2.lineWidth = 1*dpr; g2.strokeStyle = '#1d3a2c';
+  g2.beginPath();
+  for(let i=0;i<=DIV_X;i++){ const x=G.x0+i*G.dx; g2.moveTo(x,G.y0); g2.lineTo(x,G.y0+G.gH); }
+  for(let j=0;j<=DIV_Y;j++){ const y=G.y0+j*G.dy; g2.moveTo(G.x0,y); g2.lineTo(G.x0+G.gw,y); }
+  g2.stroke();
+  g2.strokeStyle = '#356a52'; g2.lineWidth = 1.5*dpr;
+  const cy = G.y0+G.gH/2, cx = G.x0+G.gw/2;
+  g2.beginPath(); g2.moveTo(G.x0,cy); g2.lineTo(G.x0+G.gw,cy); g2.moveTo(cx,G.y0); g2.lineTo(cx,G.y0+G.gH);
+  for(let i=0;i<=DIV_X*5;i++){ const x=G.x0+i*G.dx/5; g2.moveTo(x,cy-4*dpr); g2.lineTo(x,cy+4*dpr); }
+  for(let j=0;j<=DIV_Y*5;j++){ const y=G.y0+j*G.dy/5; g2.moveTo(cx-4*dpr,y); g2.lineTo(cx+4*dpr,y); }
+  g2.stroke();
+}
+function drawTrace(G, wave, color){
+  if(!wave) return;
+  const dpr = window.devicePixelRatio||1;
+  const win = Math.ceil(st.tdiv*DIV_X/1000*wave.sr);
+  const n = Math.min(win, wave.data.length);
+  const k = st.gain/UNIT*G.dy;
+  const cy = G.y0+G.gH/2, lo = G.y0, hi = G.y0+G.gH;
+  g2.save(); g2.beginPath(); g2.rect(G.x0, G.y0, G.gw, G.gH); g2.clip();
+  g2.strokeStyle = color; g2.lineWidth = 3.5*dpr; g2.lineJoin='round'; g2.lineCap='round';
+  g2.beginPath();
+  const step = Math.max(1, Math.floor(n/(G.gw*1.5)));
+  for(let i=0;i<n;i+=step){
+    const x = G.x0 + i/win*G.gw;
+    const y = Math.max(lo-2, Math.min(hi+2, cy - wave.data[i]*k));
+    i ? g2.lineTo(x,y) : g2.moveTo(x,y);
+  }
+  g2.stroke(); g2.restore();
+}
+function draw(){
+  g2.fillStyle = '#050a08'; g2.fillRect(0,0,cv.width,cv.height);
+  const G = geom();
+  drawGrid(G);
+  drawTrace(G, st.saved, '#ff6fa8');
+  drawTrace(G, st.cur, '#3dff8a');
+}
+
+/* 表示の文字 */
+function fmtF(w){
+  if(!w || w.silent) return '音がない';
+  if(!w.f) return 'はかれない';
+  return Z(Math.round(w.f)) + ' Hz';
+}
+function fmtA(w){
+  if(!w || w.silent) return '０目盛り';
+  return Z((w.amp*st.gain/UNIT).toFixed(1)) + '目盛り';
+}
+function compare(a, b){
+  const r = {hi:null, big:null};
+  if(!a || !b || a.silent || b.silent) return r;
+  if(a.f && b.f){
+    const q = b.f/a.f;
+    r.hi = q > 1.04 ? '高い' : q < 1/1.04 ? '低い' : '同じ';
+  }
+  const p = b.amp/a.amp;
+  r.big = p > 1.25 ? '大きい' : p < 0.8 ? '小さい' : '同じ';
+  return r;
+}
+function verdictHTML(){
+  if(!st.saved) return '<span class="muted">「のこす」を押すと、いまの波形をのこして、次の音と重ねてくらべられます</span>';
+  if(!st.showNum) return '<span class="muted">数値はかくしています。重なった２本の波形の「山の高さ」と「山の数」をくらべよう</span>';
+  if(!st.cur || st.cur.silent) return '<span class="muted">いまの音が入っていません</span>';
+  const r = compare(st.saved, st.cur), parts = [];
+  if(r.hi==='高い') parts.push('<span class="hi">高い音</span>（振動数が多い）');
+  else if(r.hi==='低い') parts.push('<span class="hi">低い音</span>（振動数が少ない）');
+  else if(r.hi==='同じ') parts.push('ほぼ同じ高さ');
+  else parts.push('高さは はかれない');
+  if(r.big==='大きい') parts.push('<span class="hi">大きい音</span>（振幅が大きい）');
+  else if(r.big==='小さい') parts.push('<span class="hi">小さい音</span>（振幅が小さい）');
+  else parts.push('ほぼ同じ大きさ');
+  return 'いまの音は、のこした音より　' + parts.join('　・　');
+}
+function updateText(){
+  const t = st.tdiv;
+  $('scale').innerHTML = 'よこ１目盛り＝' + Z(t) + 'ms <small>（' + Z(String(t/1000)) + '秒）　画面のはば＝' + Z(+(t*DIV_X).toFixed(1)) + 'ms</small>';
+  const s = $('status');
+  if(!st.started){ s.textContent='―'; }
+  else if(st.paused){ s.textContent='止めています'; s.classList.add('stop'); }
+  else { s.textContent = st.src==='mic' ? '● マイクで はかっています' : '● 発振器の音を映しています'; s.classList.remove('stop'); }
+  $('bF').textContent = st.started ? fmtF(st.cur) : '―';
+  $('bA').textContent = st.started ? fmtA(st.cur) : '―';
+  $('aF').textContent = st.saved ? fmtF(st.saved) : '―';
+  $('aA').textContent = st.saved ? fmtA(st.saved) : '―';
+  $('legA').style.display = st.saved ? '' : 'none';
+  $('btnClear').disabled = !st.saved;
+  $('readout').classList.toggle('hidenum', !st.showNum);
+  if(!flashT) $('verdict').innerHTML = verdictHTML();
+}
+
+/* ループ */
+function tick(){
+  step(false);
+  st.frame++;
+  draw();
+  requestAnimationFrame(tick);
+}
+function step(force){
+  if(st.started && !st.paused && st.an){
+    const w = capture();
+    w.silent = w.amp < 0.004;
+    if(force || st.frame % 6 === 0 || !st.cur){     // 振動数は重いので 1/6 フレームで更新
+      const N = w.raw.length, e = estimateF(w.raw.subarray(N-2048-Math.ceil(w.sr/60)-4), w.sr);
+      const f0 = e && e.f;
+      // 表示する振動数は、直近5回の中央値にして数字のぶれをおさえる。音が大きく変わったら前の値は捨てる
+      if(!f0 || w.amp < 0.004){ st.fHist = []; }
+      else {
+        const h = st.fHist;
+        const last = h.length ? h[h.length-1] : f0;
+        if(Math.abs(f0/last - 1) > 0.08) h.length = 0;
+        h.push(f0); if(h.length > 5) h.shift();
+      }
+      const sorted = st.fHist.slice().sort((a,b)=>a-b);
+      w.f = sorted.length ? sorted[sorted.length>>1] : null; w.conf = e ? e.conf : 0;
+    }else{ w.f = st.cur.f; w.conf = st.cur.conf; }
+    if(w.silent) w.f = null;
+    delete w.raw;
+    st.cur = w;
+    if(force || st.frame % 6 === 0) updateText();
+  }
+}
+
+/* 操作 */
+function setPaused(p){
+  st.paused = p;
+  $('btnPause').classList.toggle('on', p);
+  $('btnPause').textContent = p ? '再開（スペース）' : '止める（スペース）';
+  updateText();
+}
+function save(){
+  if(!st.cur || st.cur.silent){ flash('音が入っていないので、のこせません'); return; }
+  st.saved = {data: st.cur.data.slice(), sr: st.cur.sr, amp: st.cur.amp, f: st.cur.f, silent:false};
+  updateText();
+}
+function clearSaved(){ st.saved = null; updateText(); }
+function setT(t){
+  st.tdiv = t;
+  document.querySelectorAll('#segT .btn').forEach(b=>b.classList.toggle('on', +b.dataset.t===t));
+  for(const w of [st.cur, st.saved]) if(w && w.data) w.amp = ampOf(w.data, Math.min(w.data.length, Math.ceil(t*DIV_X/1000*w.sr)));
+  updateText();
+}
+function setG(gn){
+  st.gain = gn;
+  document.querySelectorAll('#segG .btn').forEach(b=>b.classList.toggle('on', +b.dataset.g===gn));
+  updateText();
+}
+function autoGain(){
+  const a = Math.max(st.cur && !st.cur.silent ? st.cur.amp : 0, st.saved ? st.saved.amp : 0);
+  if(!a){ flash('音が入っていません'); return; }
+  let best = GAINS[0];
+  for(const gn of GAINS) if(a*gn/UNIT <= 3.2) best = gn;   // いちばん大きい波が3目盛りくらいに
+  setG(best);
+}
+let flashT=null;
+function flash(msg){
+  clearTimeout(flashT); flashT = null;
+  $('verdict').innerHTML = '<span class="hi">'+msg+'</span>';
+  flashT = setTimeout(()=>{ flashT=null; updateText(); }, 1800);
+}
+
+/* ボタン */
+TDIVS.forEach(t=>{ const b=document.createElement('button'); b.className='btn'; b.dataset.t=t; b.textContent=Z(t)+'ms'; b.onclick=()=>setT(t); $('segT').appendChild(b); });
+GAINS.forEach(gn=>{ const b=document.createElement('button'); b.className='btn'; b.dataset.g=gn; b.textContent='×'+Z(gn); b.onclick=()=>setG(gn); $('segG').appendChild(b); });
+document.querySelectorAll('#segSrc .btn').forEach(b=>b.onclick=async()=>{
+  if(b.dataset.src==='mic'){ try{ await startMic(); }catch(e){ showErr(e); } }
+  else { ensureCtx(); st.ctx.resume(); setSrc('osc'); if(!st.playing) play(true); }
+  updateText();
+});
+document.querySelectorAll('#segNum .btn').forEach(b=>b.onclick=()=>{
+  st.showNum = b.dataset.num==='1';
+  document.querySelectorAll('#segNum .btn').forEach(x=>x.classList.toggle('on', x===b));
+  updateText();
+});
+document.querySelectorAll('[data-pf]').forEach(b=>b.onclick=()=>setOscF(+b.dataset.pf));
+document.querySelectorAll('#segV .btn').forEach(b=>b.onclick=()=>setOscV(+b.dataset.v));
+$('rngF').oninput = e => setOscF(rToF(+e.target.value));
+$('btnPlay').onclick = () => play(!st.playing);
+$('btnPause').onclick = () => { if(st.started) setPaused(!st.paused); };
+$('btnSave').onclick = save;
+$('btnClear').onclick = clearSaved;
+$('btnAuto').onclick = autoGain;
+$('btnMicStart').onclick = async () => { try{ await startMic(); updateText(); }catch(e){ showErr(e); } };
+$('btnOscStart').onclick = () => { ensureCtx(); st.ctx.resume(); setSrc('osc'); play(true); updateText(); };
+function showErr(e){
+  $('start').style.display='flex'; st.started = false;
+  $('err').textContent = 'マイクが使えませんでした（' + (e && e.name || e) + '）。アドレス欄の左のマークから「マイク」を許可して、もう一度押してください。マイクなしでも「発振器の音をそのまま映す」は使えます。';
+}
+document.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.code==='Space'){ e.preventDefault(); if(st.started) setPaused(!st.paused); }
+  else if(e.key==='s'||e.key==='S'){ save(); }
+  else if(e.key==='p'||e.key==='P'){ play(!st.playing); }
+});
+window.addEventListener('resize', resize);
+
+/* テスト用の窓口（授業では使わない） */
+window.__osc = { st, useStream, setSrc, setT, setG, setOscF, setOscV, play, save, clearSaved, setPaused, compare, estimateF, autoGain, updateText, ensureCtx, step, draw };
+
+resize(); setT(1); setG(5); setOscF(440); updateText(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>
