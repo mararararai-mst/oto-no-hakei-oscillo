@@ -194,6 +194,7 @@ const Z = s => String(s).replace(/[0-9.\-]/g, c => c==='.' ? '．' : c==='-' ? '
 const DIV_X = 10, DIV_Y = 8;
 const TDIVS = [0.5, 1];                       // ms / 目盛り（子どもどうしで同じ見え方になるよう2つだけ。最初は1ms）
 const GAINS = [1, 2, 5, 10, 20];
+const AVG_NEW = 0.2;   // 重ね平均で新しい画面をどれだけ入れるか（小さいほど なめらか・反応はおそい）
 const UNIT = 0.25;                            // 拡大×1 のとき 1目盛り＝0.25
 const FFT = 16384;
 
@@ -219,8 +220,10 @@ function ensureCtx(){
   // 雑音をへらすふるい：授業で使う音（100〜2000Hz）より低すぎる「ゴー」と高すぎる「サー」を切る
   // Q はこの2種類では dB 指定。−3.01dB でとがりのない形（ふるいの近くの音を大きくしない）
   const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 60;   hp.Q.value = -3.0103;
-  const lp = ctx.createBiquadFilter(); lp.type='lowpass';  lp.frequency.value = 4000; lp.Q.value = -3.0103;
-  hp.connect(lp); lp.connect(an);
+  // 高い方は2段重ねて急に切る（3000Hzより上の「サー」を強くへらし、2000Hzまでの音の大きさはほぼそのまま）
+  const lp1 = ctx.createBiquadFilter(); lp1.type='lowpass'; lp1.frequency.value = 3000; lp1.Q.value = -5.333;
+  const lp2 = ctx.createBiquadFilter(); lp2.type='lowpass'; lp2.frequency.value = 3000; lp2.Q.value = 2.324;
+  hp.connect(lp1); lp1.connect(lp2); lp2.connect(an);
   st.hp = hp;
   st.ctx = ctx; st.an = an; st.oscVol = vol; st.spk = spk;
   st.buf = new Float32Array(FFT);
@@ -481,6 +484,20 @@ function step(force){
     w.silent = w.amp < thr;
     st.gateOpen = !w.silent;
     if(w.silent && st.clean && st.src==='mic') w.data.fill(0);
+    // 重ね平均：同じ音が続いているあいだは、前の画面の波形と重ねて平均し、毎回ちがう細かいギザギザだけを消す
+    // （音の高さや大きさが変わったら、すぐ平均をやめて新しい波形に切りかえる）
+    if(st.clean && st.src==='mic' && !w.silent){
+      const p = st.cur, n = Math.min(Math.ceil(st.tdiv*DIV_X/1000*w.sr), w.data.length);
+      if(p && !p.silent && p.sr === w.sr && p.data.length === w.data.length && p.rawAmp){
+        const ar = w.amp / p.rawAmp;
+        let c=0, e1=0, e2=0; for(let i=0;i<n;i++){ const a=w.data[i], b=p.data[i]; c+=a*b; e1+=a*a; e2+=b*b; }
+        if(ar > 0.7 && ar < 1.4 && c/Math.sqrt(e1*e2+1e-12) > 0.6){
+          const A = AVG_NEW; for(let i=0;i<w.data.length;i++) w.data[i] = A*w.data[i] + (1-A)*p.data[i];
+        }
+      }
+      w.rawAmp = w.amp;
+      w.amp = ampOf(w.data, n);
+    }
     if(force || st.frame % 6 === 0 || !st.cur){     // 振動数は重いので 1/6 フレームで更新
       const N = w.raw.length, e = estimateF(w.raw.subarray(N-2048-Math.ceil(w.sr/60)-4), w.sr);
       const f0 = e && e.f;
